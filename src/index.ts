@@ -10,6 +10,10 @@ type Env = {
 
 // Store search results for callback queries
 const userResults = new Map<number, string[]>();
+// Store pagination state for each user
+const userPagination = new Map<number, number>();
+// Number of results to show per page
+const RESULTS_PER_PAGE = 10;
 
 // Helper function to extract only the text content from the result
 function extractTextContent(item: string): string {
@@ -74,23 +78,36 @@ app.post('/webhook', async (c) => {
       });
     }
     
-    // Limit results to prevent message too long and create inline keyboard
-    const limitedResults = results.slice(0, 10);
+    // Initialize pagination for this user
+    if (userId) {
+      userPagination.set(userId, 0); // Start at page 0
+    }
+    
+    // Calculate total pages
+    const totalPages = Math.ceil(results.length / RESULTS_PER_PAGE);
+    
+    // Get first page of results
+    const startIdx = 0;
+    const endIdx = Math.min(RESULTS_PER_PAGE, results.length);
+    const pageResults = results.slice(startIdx, endIdx);
+    
     const keyboard = new InlineKeyboard();
     
     // Add each result as a button, showing only the text content
-    limitedResults.forEach((item, index) => {
+    pageResults.forEach((item, index) => {
       const textContent = extractTextContent(item);
       keyboard.text(textContent, `result_${index}`).row();
     });
     
-    // Add navigation buttons if there are more results
-    if (results.length > 10) {
-      keyboard.text('⬅️ 上一頁', 'prev_page').text('➡️ 下一頁', 'next_page');
+    // Add pagination buttons if there are more than one page
+    if (totalPages > 1) {
+      keyboard.text('⬅️ 上一頁', 'prev_page')
+             .text(`(1/${totalPages})`, 'page_info')
+             .text('下一頁 ➡️', 'next_page');
     }
     
     // Format the results message
-    const message = `找到 ${results.length} 個匹配結果。以下是前 ${limitedResults.length} 個：`;
+    const message = `找到 ${results.length} 個匹配結果。以下是第 1 頁，共 ${totalPages} 頁：`;
     
     return ctx.reply(message, { reply_markup: keyboard });
   });
@@ -117,9 +134,64 @@ app.post('/webhook', async (c) => {
       }
       await ctx.answerCallbackQuery();
     }
-    // Handle pagination (would need to store state for this to work properly)
-    else if (callbackData === 'prev_page' || callbackData === 'next_page') {
-      await ctx.answerCallbackQuery({ text: '分頁功能正在開發中...' });
+    // Handle pagination
+    else if (callbackData === 'prev_page' || callbackData === 'next_page' || callbackData === 'page_info') {
+      if (!userId) {
+        await ctx.answerCallbackQuery({ text: '無法識別用戶' });
+        return;
+      }
+      
+      const results = userResults.get(userId);
+      
+      if (!results || results.length === 0) {
+        await ctx.answerCallbackQuery({ text: '沒有搜尋結果' });
+        return;
+      }
+      
+      // Calculate total pages
+      const totalPages = Math.ceil(results.length / RESULTS_PER_PAGE);
+      
+      // Get current page
+      let currentPage = userPagination.get(userId) || 0;
+      
+      // Handle page navigation
+      if (callbackData === 'prev_page') {
+        currentPage = Math.max(0, currentPage - 1);
+        userPagination.set(userId, currentPage);
+      } else if (callbackData === 'next_page') {
+        currentPage = Math.min(totalPages - 1, currentPage + 1);
+        userPagination.set(userId, currentPage);
+      } else if (callbackData === 'page_info') {
+        await ctx.answerCallbackQuery({ text: `第 ${currentPage + 1} 頁，共 ${totalPages} 頁` });
+        return;
+      }
+      
+      // Calculate start and end indices for current page
+      const startIdx = currentPage * RESULTS_PER_PAGE;
+      const endIdx = Math.min(startIdx + RESULTS_PER_PAGE, results.length);
+      const pageResults = results.slice(startIdx, endIdx);
+      
+      // Create keyboard for current page
+      const keyboard = new InlineKeyboard();
+      
+      // Add each result as a button
+      pageResults.forEach((item, pageIndex) => {
+        const actualIndex = startIdx + pageIndex; // Calculate the actual index in the full results array
+        const textContent = extractTextContent(item);
+        keyboard.text(textContent, `result_${actualIndex}`).row();
+      });
+
+      // Add pagination buttons
+      keyboard.text('⬅️ 上一頁', 'prev_page')
+             .text(`(${currentPage + 1}/${totalPages})`, 'page_info')
+             .text('下一頁 ➡️', 'next_page');
+      
+      // Update the message text and keyboard
+      await ctx.editMessageText(`找到 ${results.length} 個匹配結果。以下是第 ${currentPage + 1} 頁，共 ${totalPages} 頁：`, {
+        reply_markup: keyboard
+      });
+      
+      await ctx.answerCallbackQuery();
     }
   });
 
