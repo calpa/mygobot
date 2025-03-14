@@ -1,0 +1,23 @@
+# Environment variables
+.dev.vars
+
+# Dependency directories
+node_modules/
+
+# Wrangler local state
+.wrangler/
+
+# Build outputs
+dist/
+
+# OS specific files
+.DS_Store
+
+# Editor directories and files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

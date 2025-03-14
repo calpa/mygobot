@@ -1,0 +1,11 @@
+name = "mygobot"
+compatibility_date = "2025-03-14"
+main = "src/index.ts"
+
+# Configure environment variables
+[vars]
+# BOT_TOKEN will be set via wrangler secret
+
+[dev]
+port = 8787
+
