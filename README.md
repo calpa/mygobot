@@ -69,6 +69,57 @@ After deployment, you need to set up a webhook for your Telegram bot. Replace `Y
 https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=YOUR_WORKER_URL/webhook
 ```
 
+## Architecture
+
+The following diagram illustrates the architecture of the MyGO!!!!! Bot:
+
+```mermaid
+graph TD
+    A[User] -->|Sends messages| B[Telegram]
+    B -->|Webhook| C[Cloudflare Workers]
+    
+    subgraph CloudflareEnv[Cloudflare Workers Environment]
+        C -->|Processes requests| D[Hono App]
+        D -->|Routes| E[Webhook Endpoint]
+        D -->|Health check| F[Root Endpoint]
+        
+        E -->|Handles Telegram events| G[Grammy Bot]
+        
+        subgraph BotFunc[Bot Functionality]
+            G -->|Command handling| H[Start & Help Commands]
+            G -->|Message handling| I[Search Functionality]
+            G -->|Callback handling| J[Result Selection & Pagination]
+        end
+        
+        I -->|Queries| K[(data.json)]
+        J -->|Retrieves| K
+        
+        subgraph Storage[In-memory Storage]
+            L[userResults Map]
+            M[userPagination Map]
+        end
+        
+        I -->|Stores results| L
+        J -->|Updates pagination| M
+        J -->|Retrieves results| L
+    end
+    
+    G -->|Sends responses| B
+    J -->|Fetches images| N[Cloudflare R2 Storage]
+    
+    classDef external fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef storage fill:#bbf,stroke:#333,stroke-width:2px;
+    classDef component fill:#bfb,stroke:#333,stroke-width:2px;
+    
+    class A,B,N external;
+    class K,L,M storage;
+    class D,E,F,G,H,I,J component;
+    
+    style CloudflareEnv fill:#f5f5f5,stroke:#333,stroke-width:1px
+    style BotFunc fill:#e6f7ff,stroke:#333,stroke-width:1px
+    style Storage fill:#fff7e6,stroke:#333,stroke-width:1px
+```
+
 ## Usage
 
 Once the bot is deployed and the webhook is set up, users can interact with it on Telegram:
