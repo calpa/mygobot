@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { Bot, webhookCallback, InlineKeyboard } from 'grammy';
 import data from './data.json';
+// Import Fuse at the top of your file
+import Fuse from 'fuse.js';
 
 // Define environment variable types for Cloudflare Workers
 type Env = {
@@ -56,9 +58,13 @@ app.post('/webhook', async (c) => {
     const userId = ctx.from?.id;
     
     // Search for matches in the data
-    const results = data.filter(item => 
-      item.toLowerCase().includes(query)
-    );
+    const fuse = new Fuse(data, {
+      threshold: 0.5, // A lower threshold means a more exact match
+      ignoreLocation: true,
+      includeScore: true
+    });
+
+    const results = fuse.search(query).map(result => result.item);
     
     // Store results for this user for callback handling
     if (userId) {
