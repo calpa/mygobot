@@ -17,7 +17,7 @@
   "dependencies": {
     "@cloudflare/workers-types": "^4.20250313.0",
     "grammy": "^1.35.0",
-    "hono": "^4.7.4",
+    "hono": "^4.12.4",
     "wrangler": "^4.0.0"
   }
 }
